@@ -1,0 +1,289 @@
+{
+"AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "",
+    "Metadata": {
+
+    },
+    "Parameters": {
+        "EnvironmentName": {
+            "Description": "Select an Environment",
+            "Type": "String",
+            "AllowedValues": [
+              "Dev",
+              "Stg"
+            ],
+            "ConstraintDescription": "Environment must match with specified AllowedValue"
+        },
+        "VpcCidr": {
+          "Description": "create cidr block for VPC",
+          "Type": "String",
+          "Default": "10.0.0.0/16"
+        },
+        "PubSubnet1Cidr": {
+          "Description": "create cidr block for public subnet",
+          "Type": "String",
+          "Default": "10.0.10.0/24"
+        },  
+        "PubSubnet2Cidr": {
+            "Description": "create cidr block for public subnet",
+            "Type": "String",
+            "Default": "10.0.20.0/24"
+          },  
+        "PrivSubnet1Cidr": {
+          "Description": "create cidr block for private subnet",
+          "Type": "String",
+          "Default": "10.0.30.0/24"
+        },
+        "PrivSubnet2Cidr": {
+            "Description": "create cidr block for private subnet",
+            "Type": "String",
+            "Default": "10.0.40.0/24"
+        },
+        "PrivSubnet3Cidr": {
+            "Description": "create cidr block for private subnet",
+            "Type": "String",
+            "Default": "10.0.50.0/24"
+        },
+        "PrivSubnet4Cidr": {
+            "Description": "create cidr block for private subnet",
+            "Type": "String",
+            "Default": "10.0.60.0/24"
+        }
+
+    },
+    "Mappings": {
+
+    },
+    "Conditions": {
+
+    },
+    "Resources": {
+        "AhJoeVPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+            "CidrBlock": { "Ref": "VpcCidr" },
+            "EnableDnsSupport": "true",
+            "EnableDnsHostnames": "true",
+            "Tags": [{ "Key": "Name", "Value":  "AhjoeVPC" }]
+            }
+        },
+        "pubsubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+            "AvailabilityZone": "us-east-1a",
+            "MapPublicIpOnLaunch": true,
+            "VpcId": { "Ref": "AhJoeVPC" },
+            "CidrBlock": { "Ref": "PubSubnet1Cidr" },
+            "Tags": [{ "Key": "Name", "Value":  "pub-sub-net-1" }]
+            }
+        },
+        "pubsubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+            "AvailabilityZone": "us-east-1b",
+            "MapPublicIpOnLaunch": true,
+            "VpcId": { "Ref": "AhJoeVPC" },
+            "CidrBlock": { "Ref": "PubSubnet2Cidr" },
+            "Tags": [{ "Key": "Name", "Value":  "pub-sub-net-2" }]
+            }
+        },
+        "privsubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+            "AvailabilityZone": "us-east-1a",
+            "VpcId": { "Ref": "AhJoeVPC" },
+            "CidrBlock": { "Ref": "PrivSubnet1Cidr" },
+            "Tags": [{ "Key": "Name", "Value":  "priv-sub-net-1" }]
+            }
+        },
+        "privsubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+            "AvailabilityZone": "us-east-1b",
+            "VpcId": { "Ref": "AhJoeVPC" },
+            "CidrBlock": { "Ref": "PrivSubnet2Cidr" },
+            "Tags": [{ "Key": "Name", "Value":  "priv-sub-net-2" }]
+            }
+        },
+        "privsubnet3": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+            "AvailabilityZone": "us-east-1a",
+            "VpcId": { "Ref": "AhJoeVPC" },
+            "CidrBlock": { "Ref": "PrivSubnet3Cidr" },
+            "Tags": [{ "Key": "Name", "Value":  "priv-sub-net-3" }]
+            }
+        },
+        "privsubnet4": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+            "AvailabilityZone": "us-east-1b",
+            "VpcId": { "Ref": "AhJoeVPC" },
+            "CidrBlock": { "Ref": "PrivSubnet4Cidr" },
+            "Tags": [{ "Key": "Name", "Value":  "priv-sub-net-4" }]
+            }
+        },
+
+        "InternetGW": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+            "Tags":[{ "Key": "Name", "Value":  "InternetGateway" }]
+            }
+        },
+        "AttachGateway": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+            "VpcId": { "Ref": "AhJoeVPC" },
+            "InternetGatewayId": { "Ref": "InternetGW" }
+            }
+        },
+        "pubRT": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+            "VpcId": { "Ref": "AhJoeVPC" },
+            "Tags":[{ "Key": "Name", "Value":  "pubRT" }]
+            }
+        },
+        "pubroute": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+            "RouteTableId": { "Ref": "pubRT" },
+            "DestinationCidrBlock": "0.0.0.0/0",
+            "GatewayId": { "Ref": "InternetGW" }
+            }
+        },
+        "pub1assoc": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+            "SubnetId": { "Ref": "pubsubnet1" },
+            "RouteTableId": { "Ref": "pubRT" }
+            }
+        },
+        "pub2assoc": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+            "SubnetId": { "Ref": "pubsubnet2" },
+            "RouteTableId": { "Ref": "pubRT" }
+            }
+        },
+        "myVpcInternetGateWayAttachement":{
+            "Type" : "AWS::EC2::VPCGatewayAttachment",
+            "Properties" : {
+                "InternetGatewayId" : {"Ref":"InternetGW"},
+                "VpcId" : {"Ref":"AhJoeVPC"}
+            }
+        },
+        "NatGateway": {
+            "Type" : "AWS::EC2::NatGateway",
+            "Properties" : {
+                "AllocationId" : {"Fn::GetAtt" : ["EIP", "AllocationId"]},
+                "SubnetId" : { "Ref": "pubsubnet1" },
+                "Tags" : [{ "Key": "Name", "Value":  "natgateway" }]
+            }
+        },
+        "EIP" : {
+            "Type" : "AWS::EC2::EIP",
+            "DependsOn": ["myVpcInternetGateWayAttachement"],
+            "Properties" : {
+                "Domain" : { "Ref": "AhJoeVPC" }
+            }
+        },
+        "PrivRT": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+            "VpcId": { "Ref": "AhJoeVPC" },
+            "Tags": [{ "Key": "Name", "Value":  "privateRT" }]
+            }
+        },
+        "NatRoute": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+            "RouteTableId": { "Ref": "PrivRT" },
+            "DestinationCidrBlock": "0.0.0.0/0",
+            "NatGatewayId": { "Ref": "NatGateway" }
+            }
+        },
+        "priv1ass": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+            "SubnetId": { "Ref": "privsubnet1" },
+            "RouteTableId": { "Ref": "PrivRT" }
+            }
+        },
+        "priv2ass": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+            "SubnetId": { "Ref": "privsubnet2" },
+            "RouteTableId": { "Ref": "PrivRT" }
+            }
+        },
+        "priv3ass": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+            "SubnetId": { "Ref": "privsubnet3" },
+            "RouteTableId": { "Ref": "PrivRT" }
+            }
+        },
+        "priv4ass": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+            "SubnetId": { "Ref": "privsubnet4" },
+            "RouteTableId": { "Ref": "PrivRT" }
+            }
+        },
+
+    },
+    "Outputs": {
+        "AhJoeVPC" : {
+            "Description" : "The ID of the VPC",
+            "Value" : { "Ref" : "AhJoeVPC" },
+            "Export" : {
+                "Name" : {"Fn::Sub": "${AWS::StackName}-VPCID" }
+            }
+            },
+        "pubsubnet1" : {
+            "Description" : "The ID of pub subnet1",
+            "Value" : { "Ref" : "pubsubnet1" },
+            "Export" : {
+                "Name" : {"Fn::Sub": "${AWS::StackName}-PUB-SN-1" }
+            }
+            },
+        "pubsubnet2" : {
+            "Description" : "The ID of pub subnet2",
+            "Value" : { "Ref" : "pubsubnet2" },
+            "Export" : {
+                "Name" : {"Fn::Sub": "${AWS::StackName}-PUB-SN-2" }
+            }
+            },
+        "privsubnet1" : {
+            "Description" : "The ID of the priv subnet1",
+            "Value" : { "Ref" : "privsubnet1" },
+            "Export" : {
+                "Name" : {"Fn::Sub": "${AWS::StackName}-PRIV-SN-1" }
+            }
+            },
+        "privsubnet2" : {
+            "Description" : "The ID of the priv subnet2",
+            "Value" : { "Ref" : "privsubnet2" },
+            "Export" : {
+                "Name" : {"Fn::Sub": "${AWS::StackName}-PRIV-SN-2" }
+            }
+            }, 
+        "privsubnet3" : {
+            "Description" : "The ID of the priv subnet3",
+            "Value" : { "Ref" : "privsubnet3" },
+            "Export" : {
+                "Name" : {"Fn::Sub": "${AWS::StackName}-PRIV-SN-3" }
+            }
+            },
+        "privsubnet4" : {
+            "Description" : "The ID of the priv subnet4",
+            "Value" : { "Ref" : "privsubnet4" },
+            "Export" : {
+                "Name" : {"Fn::Sub": "${AWS::StackName}-PRIV-SN-4" }
+            }
+            }               
+        
+        }
+        
+}

@@ -1,0 +1,12 @@
+Sample test code
+"InternalLbDns": {
+    "Type" : "AWS::SSM::Parameter",
+    "Properties" : {
+        "DataType" : "String",
+        "Description" : "DNS of internal LB",
+        "Name" : "/InternalLbDns",
+        "Tier" : "Standard",
+        "Type" : "String",
+        "Value" : [{ "Fn::GetAtt": "ApplicationLoadBalancer2.DNSName"}]
+}
+}

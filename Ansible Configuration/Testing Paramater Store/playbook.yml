@@ -1,0 +1,31 @@
+
+
+
+
+
+- name: Before Ansible 2.3, option 'dest', 'destfile' or 'name' was used instead of 'path'
+  ansible.builtin.replace:
+    path: /etc/hosts/nginx.conf
+    regexp: '[REPLACE-WITH-INTERNAL-LOADBALANCER-DNS]'
+    replace: '\1new.host.name\2
+
+
+- name: Replace a localhost entry with our own
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.0\.1'
+    line: 127.0.0.1 localhost
+    owner: root
+    group: root
+    mode: '0644'
+
+
+
+- name: Create or update key/value pair in aws parameter store
+  community.aws.aws_ssm_parameter_store:
+    name: "Hello"
+    description: "This is your first key"
+    value: "World"
+
+
+put_parameter

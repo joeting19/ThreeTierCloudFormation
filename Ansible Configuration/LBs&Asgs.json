@@ -1,0 +1,363 @@
+{
+"AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "",
+    "Metadata": {
+
+    },
+    "Parameters": {
+        "OwnIP": {
+            "Description": "The Users own IP address",
+            "Type": "String",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "Default": "0.0.0.0/0",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+          },  
+        "AcmCertificate": {
+            "Description": "The ARN of the AWS Certification Manager's certificate",
+            "Type": "String"
+          },      
+        "ExportVpcStackName": {
+            "Description": "Name of the vpc stack that exports values",
+            "Type": "String",
+            "MinLength" : 1,
+            "MaxLength" : 255,
+            "AllowedPattern" : "^[a-zA-Z][-a-zA-Z0-9]*$",
+            "Default" : "vpc"
+          }, 
+        "KeyPair": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+          }   
+    },
+    "Resources": {
+     
+        "SecurityGroupLBPub" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+            "GroupDescription" : "pub LB security group",
+            "SecurityGroupIngress" : [
+                {
+                  "IpProtocol" : "tcp",
+                  "FromPort" : 80,
+                  "ToPort" : 80,
+                  "CidrIp" : "0.0.0.0/0"
+                }],
+            "SecurityGroupEgress" : [{
+                "IpProtocol" : -1,
+                "FromPort" : -1,
+                "ToPort" : -1,
+                "CidrIp" : "0.0.0.0/0"
+            }],
+            "VpcId" : {"Fn::ImportValue": {"Fn::Sub": "vpc-VPCID"}},
+            "Tags" :  [{"Key": "Name","Value": "Pub LB sg"}]
+            }
+        },
+
+                    
+        
+        "WebServerSecurityGroup" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "DependsOn" : "ApplicationLoadBalancer",
+            "Properties" : {
+              "GroupDescription" : "Enable SSH access and HTTP from the load balancer only",
+              "SecurityGroupIngress" : [ {
+                "IpProtocol" : "tcp",
+                "FromPort" : "22",
+                "ToPort" : "22",
+                "CidrIp" : { "Fn::Join" : [ "", [{"Fn::ImportValue": "MainNodeIP"} ,"/32"] ] } 
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "80",
+                "ToPort" : "80",
+                "SourceSecurityGroupId" : {"Fn::Select" : [0, {"Fn::GetAtt" : ["ApplicationLoadBalancer", "SecurityGroups"]}]}
+              } ],
+              "VpcId" : { 
+                "Fn::ImportValue": {
+                "Fn::Sub": "${ExportVpcStackName}-VPCID"
+            }}
+            }
+          },
+        "SecurityGroupLBPriv" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+            "GroupDescription" : "pub LB security group",
+            "SecurityGroupIngress" : [
+                { "IpProtocol" : "tcp",
+                  "FromPort" : 80,
+                  "ToPort" : 80,
+                  "SourceSecurityGroupId": { "Ref":"WebServerSecurityGroup"}},
+                { "IpProtocol" : "tcp",
+                  "FromPort" : 22,
+                  "ToPort" : 22,
+                  "CidrIp" : {"Ref": "OwnIP"}                 
+                        }],
+            "SecurityGroupEgress" : [{
+                "IpProtocol" : -1,
+                "FromPort" : -1,
+                "ToPort" : -1,
+                "CidrIp" : "0.0.0.0/0"
+            }],
+            "VpcId" : {"Fn::ImportValue": {"Fn::Sub": "vpc-VPCID"}},
+            "Tags" :  [{"Key": "Name","Value": "Internal LB sg"}]
+            }
+        },       
+        "AppServerSecurityGroup" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+              "GroupDescription" : "Enable SSH access and HTTP from the load balancer only",
+              "SecurityGroupIngress" : [ {
+                "IpProtocol" : "tcp",
+                "FromPort" : "22",
+                "ToPort" : "22",
+                "CidrIp" : { "Fn::Join" : [ "", [{"Fn::ImportValue": "MainNodeIP"} ,"/32"] ] } 
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "4000",
+                "ToPort" : "4000",
+                "SourceSecurityGroupId" : {"Fn::Select" : [0, {"Fn::GetAtt" : ["ApplicationLoadBalancer2", "SecurityGroups"]}]}
+              },
+              {
+                "IpProtocol" : "tcp",
+                "FromPort" : "4000",
+                "ToPort" : "4000",
+                "CidrIp" : {"Ref": "OwnIP"}     
+                } ],
+              "VpcId" : { 
+                "Fn::ImportValue": {
+                "Fn::Sub": "${ExportVpcStackName}-VPCID"
+            }}
+            }
+          },
+        "ApplicationLoadBalancer": {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "Name": "WebFacingLoadbalancer",
+                "Scheme": "internet-facing",
+                "SecurityGroups": [{"Fn::GetAtt" : ["SecurityGroupLBPub", "GroupId"]}],
+                "Subnets": [
+                    {"Fn::ImportValue": {"Fn::Sub": "${ExportVpcStackName}-PUB-SN-1"}},
+                    {"Fn::ImportValue": {"Fn::Sub": "${ExportVpcStackName}-PUB-SN-2"}}
+                ]
+            }
+        },
+        "ApplicationLoadBalancer2": {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "Name": "InternalLoadbalancer",
+                "Scheme": "internal",
+                "SecurityGroups": [{"Fn::GetAtt" : ["SecurityGroupLBPriv", "GroupId"]}],
+                "Subnets": [
+                    {"Fn::ImportValue": {"Fn::Sub": "${ExportVpcStackName}-PRIV-SN-1"}},
+                    {"Fn::ImportValue": {"Fn::Sub": "${ExportVpcStackName}-PRIV-SN-2"}}
+                ]
+            }
+        },
+        "ALBTargetGroup": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties" : {
+                "HealthCheckIntervalSeconds" : 30,
+                "HealthCheckTimeoutSeconds" : 5,
+                "HealthyThresholdCount" : 3,
+                "HealthCheckPath": "/health",
+                "Port" : 80,
+                "Protocol" : "HTTP",
+                "UnhealthyThresholdCount" : 5,
+                "VpcId": { 
+                    "Fn::ImportValue": {
+                    "Fn::Sub": "${ExportVpcStackName}-VPCID"
+                }}
+            }
+        },
+        "ALBTargetGroup2": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties" : {
+                "HealthCheckIntervalSeconds" : 30,
+                "HealthCheckTimeoutSeconds" : 5,
+                "HealthyThresholdCount" : 3,
+                "TargetType": "instance",
+                "HealthCheckPath": "/health",
+                "Port" : 4000,
+                "Protocol" : "HTTP",
+                "UnhealthyThresholdCount" : 5,
+                "VpcId": { 
+                    "Fn::ImportValue": {
+                    "Fn::Sub": "${ExportVpcStackName}-VPCID"
+                }}
+            }
+        },
+        "ALBListener" : {
+            "Type" : "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties" : {
+              "DefaultActions" : [{
+                "Type" : "forward",
+                "TargetGroupArn" : { "Ref" : "ALBTargetGroup" }
+              }],
+              "LoadBalancerArn" : { "Ref" : "ApplicationLoadBalancer" },
+              "Port" : "80",
+              "Protocol" : "HTTP"
+            }
+          },
+        "ALBListener2" : {
+            "Type" : "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties" : {
+              "DefaultActions" : [{
+                "Type" : "forward",
+                "TargetGroupArn" : { "Ref" : "ALBTargetGroup2" }
+              }],
+              "LoadBalancerArn" : { "Ref" : "ApplicationLoadBalancer2" },
+              "Port" : "80",
+              "Protocol" : "HTTP"
+            }
+          },
+        "LaunchTemplateWS": {
+            "Type": "AWS::EC2::LaunchTemplate",
+            "Properties": {
+                "LaunchTemplateName": {
+                    "Fn::Sub": "${AWS::StackName}-launchTemplate4ASG-WS"
+                },
+                "LaunchTemplateData": {
+                    "ImageId": "ami-0cff7528ff583bf9a",
+                    "IamInstanceProfile":{
+                        "Arn": {"Fn::ImportValue": "EC2-SSM-S3-Role-ARN"}
+                        },
+                    "InstanceType": "t2.micro",
+                    "KeyName": {"Ref": "KeyPair"},
+                    "SecurityGroupIds":[{"Ref" : "WebServerSecurityGroup"}],
+                    "TagSpecifications": [
+                        {"ResourceType" : "instance",
+                         "Tags" : [ { "Key": "Typ", "Value":  "Web" }]}
+                    ]
+
+                }
+            }
+        },
+        "LaunchTemplateAS": {
+            "Type": "AWS::EC2::LaunchTemplate",
+            "Properties": {
+                "LaunchTemplateName": {
+                    "Fn::Sub": "${AWS::StackName}-launchTemplate4ASG-AS"
+                },
+                "LaunchTemplateData": {
+                    "IamInstanceProfile":{
+                        "Arn": {"Fn::ImportValue": "EC2-SSM-S3-Role-ARN"}
+                        },
+                    "ImageId": "ami-0cff7528ff583bf9a",
+                    "InstanceType": "t2.micro",
+                    "KeyName": {"Ref": "KeyPair"},
+                    "SecurityGroupIds":[{"Ref" : "AppServerSecurityGroup"}],
+                    "TagSpecifications": [
+                        {"ResourceType" : "instance",
+                         "Tags" : [ { "Key": "Typ", "Value":  "App" }]} ]
+                }
+            }
+        },
+        "AutoScalingGroup": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "LaunchTemplate": {
+                    "LaunchTemplateId": {
+                        "Ref": "LaunchTemplateWS"
+                    },
+                    "Version": {
+                        "Fn::GetAtt": [
+                            "LaunchTemplateWS",
+                            "LatestVersionNumber"
+                        ]
+                    }
+                },
+                "MaxSize": "5",
+                "MinSize": "2",
+                "DesiredCapacity": "2",
+                "TargetGroupARNs": [{"Ref": "ALBTargetGroup"}],
+                "VPCZoneIdentifier": [
+                    {"Fn::ImportValue": {"Fn::Sub": "vpc-PUB-SN-1"}},
+                    {"Fn::ImportValue": {"Fn::Sub": "vpc-PUB-SN-2"}}
+                ],
+                "MetricsCollection": [
+                    {
+                        "Granularity": "1Minute"
+                    }
+                ]
+            }
+        },
+
+        "AutoScalingGroup2": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "LaunchTemplate": {
+                    "LaunchTemplateId": {
+                        "Ref": "LaunchTemplateAS"
+                    },
+                    "Version": {
+                        "Fn::GetAtt": [
+                            "LaunchTemplateAS",
+                            "LatestVersionNumber"
+                        ]
+                    }
+                },
+                "MaxSize": "5",
+                "MinSize": "2",
+                "DesiredCapacity": "2",
+                "TargetGroupARNs": [{"Ref": "ALBTargetGroup2"}],
+                "VPCZoneIdentifier": [
+                    {"Fn::ImportValue": {"Fn::Sub": "vpc-PRIV-SN-1"}},
+                    {"Fn::ImportValue": {"Fn::Sub": "vpc-PRIV-SN-2"}}
+                ],
+                "MetricsCollection": [
+                    {
+                        "Granularity": "1Minute"
+                    }
+                ]
+            }
+        },
+        "ScalingPolicy07": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "AutoScalingGroup"
+                },
+                "ScalingAdjustment": "1"
+            }
+        },
+
+        "ScalingPolicy02": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "AutoScalingGroup2"
+                },
+                "ScalingAdjustment": "1"
+            }
+        },
+        "InternalLbDns": {
+            "Type" : "AWS::SSM::Parameter",
+            "Properties" : {
+                "AllowedPattern" : "String",
+                "DataType" : "String",
+                "Description" : "DNS of internal LB",
+                "Name" : "InternalLbDns",
+                "Tier" : "Standard",
+                "Type" : "String",
+                "Value" : { "Fn::GetAtt": "ApplicationLoadBalancer2.DNSName"
+              }
+        }
+        }
+    },
+    "Outputs": {
+        "AppServerSecurityGroup" : {
+            "Description" : "The ID of App server sg",
+            "Value" : { "Ref" : "AppServerSecurityGroup" },
+            "Export" : {
+                "Name" : "AppServerSecurityGroup"
+            }
+        }
+
+
+    }
+}

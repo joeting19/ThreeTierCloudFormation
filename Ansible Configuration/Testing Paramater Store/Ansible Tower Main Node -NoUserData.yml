@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Ansible Tower Instance 
+
+Parameters: 
+
+  BastionAMIID:
+    Description: AMI ImageId
+    Type: String
+    Default: ami-0cff7528ff583bf9a #is amazon linux 2
+    ConstraintDescription: Must be red hat enterprise Linux 8 (HVM) 
+  AnsibleAMIID:
+    Description: AMI ImageId
+    Type: String
+    Default: ami-052efd3df9dad4825 #is ubuntu
+    ConstraintDescription: Must be red hat enterprise Linux 8 (HVM)
+  KeyPair:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  ExportVpcStackName:
+    Description: The name of the vpc stack that exports values
+    Type: String
+    Default: vpc    
+Resources: 
+  MainNodeSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: sg for ansible main node
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            CidrIp: '0.0.0.0/0'
+          - IpProtocol: tcp
+            FromPort: 22
+            ToPort: 22
+            CidrIp: '0.0.0.0/0'  #need to change thislocation , not best practice
+        SecurityGroupEgress:
+          - IpProtocol: -1
+            FromPort: -1
+            ToPort: -1
+            CidrIp: '0.0.0.0/0'
+        VpcId: !ImportValue
+          Fn::Sub: ${ExportVpcStackName}-VPCID
+        Tags:
+          - Key: Name
+            Value: MainNodeSg
+  AnsibleInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: AnsibleInstanceProfile
+      Roles:
+        - Ansible
+
+
+  Bastion:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName: 
+        Ref: KeyPair
+      ImageId:
+        Ref: BastionAMIID
+      InstanceType: t2.micro
+      IamInstanceProfile: !ImportValue
+        EC2-SSM-S3-Role
+      SecurityGroupIds:
+      - Ref: MainNodeSecurityGroup
+      SubnetId: !ImportValue  
+       Fn::Sub: ${ExportVpcStackName}-PUB-SN-1 # Fn::ImportValue  
+      Tags:
+        - Key: Name
+          Value: BastionHost
+          
+  AnsibleTower:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName: 
+        Ref: KeyPair
+      ImageId:
+        Ref: AnsibleAMIID
+      InstanceType: t2.micro
+      IamInstanceProfile: 
+        Ref: AnsibleInstanceProfile
+      SecurityGroupIds:
+      - Ref: MainNodeSecurityGroup
+      SubnetId: !ImportValue  
+       Fn::Sub: ${ExportVpcStackName}-PRIV-SN-1 # Fn::ImportValue
+      Tags:
+        - Key: Name
+          Value: AnsibleMainNode
+
+Outputs:
+  AnsibleTower:
+    Description: Main Node IP
+    Value: !GetAtt 'AnsibleTower.PrivateIp'
+    Export:
+      Name: MainNodeIP
+
+

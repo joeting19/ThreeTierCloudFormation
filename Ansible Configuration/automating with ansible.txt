@@ -1,0 +1,13 @@
+Download th efiles into the instances... unzip them... take relevant files and modify them using parameters...
+
+
+sudo apt update -y
+sudo apt-get install unzip
+
+cd to path i want to download files
+
+wget https://github.com/aws-samples/aws-three-tier-web-architecture-workshop/archive/refs/heads/main.zip
+
+
+unzip main.zip
+

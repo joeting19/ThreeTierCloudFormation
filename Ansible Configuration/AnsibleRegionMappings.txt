@@ -1,0 +1,4 @@
+mappings for ami red hat for ansible tower
+
+ami-06640050dc3f556bb  
+ami-092b43193629811af  Ohio
